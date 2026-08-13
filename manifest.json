@@ -1,0 +1,17 @@
+{
+  "name": "言の葉 Kotonoha — เรียนภาษาญี่ปุ่น",
+  "short_name": "言の葉",
+  "description": "แอปเรียนภาษาญี่ปุ่นครบวงจร: คันจิ N5-N1 + 常用, พจนานุกรมสามภาษา, ไวยากรณ์, แฟลชการ์ด",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#16233F",
+  "theme_color": "#16233F",
+  "lang": "th",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
