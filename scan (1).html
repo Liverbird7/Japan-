@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>สแกน — 言の葉</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<meta name="theme-color" content="#16233F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Noto+Sans+Thai:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ai:#16233F; --ai-2:#1F3358; --washi:#F5EFE1; --washi-2:#EAE1CB;
+  --sumi:#241F1C; --vermilion:#BC4A34; --gold:#A6824A; --sage:#5C7A63;
+  --line:rgba(166,130,74,.35); --muted:rgba(245,239,225,.62); --ink-muted:#6B6158;
+  --sans:'Zen Kaku Gothic New','Noto Sans Thai',system-ui,sans-serif;
+  --serif:'Shippori Mincho B1','Noto Sans Thai',serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{background:var(--ai);color:var(--washi);font-family:var(--sans);line-height:1.6;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  -webkit-tap-highlight-color:transparent}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px}
+
+/* header */
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0}
+.back{color:var(--muted);text-decoration:none;font-size:.95rem;display:flex;align-items:center;gap:6px;min-height:44px}
+.back b{font-family:var(--serif);color:var(--washi);font-size:1.15rem;font-weight:700}
+.icon-btn{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:rgba(245,239,225,.06);display:grid;place-items:center;font-size:1.1rem}
+.icon-btn[aria-pressed="true"]{background:var(--gold);color:var(--ai);border-color:var(--gold)}
+
+/* viewfinder */
+.finder{position:relative;border-radius:18px;overflow:hidden;background:#000;aspect-ratio:3/4;max-height:62vh;width:100%;margin:0 auto}
+@media (min-width:600px){.finder{aspect-ratio:4/3}}
+.finder video,.finder img.still{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.finder img.still{display:none}
+.frame{position:absolute;left:8%;right:8%;top:30%;height:30%;transition:all .25s ease}
+.finder.vert .frame{left:30%;right:30%;top:10%;height:80%}
+.frame::before{content:"";position:absolute;inset:0;box-shadow:0 0 0 100vmax rgba(10,16,30,.55);border-radius:6px}
+.frame i{position:absolute;width:26px;height:26px;border:3px solid var(--vermilion)}
+.frame i:nth-child(1){left:-2px;top:-2px;border-right:0;border-bottom:0;border-top-left-radius:6px}
+.frame i:nth-child(2){right:-2px;top:-2px;border-left:0;border-bottom:0;border-top-right-radius:6px}
+.frame i:nth-child(3){left:-2px;bottom:-2px;border-right:0;border-top:0;border-bottom-left-radius:6px}
+.frame i:nth-child(4){right:-2px;bottom:-2px;border-left:0;border-top:0;border-bottom-right-radius:6px}
+.hint{position:absolute;left:0;right:0;bottom:12px;text-align:center;font-size:.85rem;color:var(--washi);text-shadow:0 1px 3px #000;padding:0 16px}
+.cam-gate{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;background:radial-gradient(circle at 50% 40%,var(--ai-2),#0c1426)}
+.cam-gate .big{font-family:var(--serif);font-size:3.2rem;line-height:1;color:var(--washi);letter-spacing:.08em}
+.cam-gate p{margin:0;color:var(--muted);max-width:30ch;font-size:.95rem}
+.finder-tools{position:absolute;top:10px;right:10px;display:flex;flex-direction:column;gap:8px}
+.finder-tools .icon-btn{background:rgba(10,16,30,.55);border-color:rgba(245,239,225,.25);backdrop-filter:blur(6px)}
+.scanline{position:absolute;left:0;right:0;height:2px;background:var(--vermilion);box-shadow:0 0 12px var(--vermilion);top:0;display:none}
+.busy .scanline{display:block;animation:scan 1.4s ease-in-out infinite alternate}
+@keyframes scan{to{top:calc(100% - 2px)}}
+
+/* controls */
+.controls{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:16px 0 8px}
+.controls .side{display:flex;gap:10px}
+.controls .side.r{justify-content:flex-end}
+.shutter{width:76px;height:76px;border-radius:50%;border:4px solid var(--washi);background:var(--vermilion);box-shadow:0 0 0 4px var(--ai),0 6px 20px rgba(0,0,0,.4);transition:transform .1s}
+.shutter:active{transform:scale(.93)}
+.shutter:disabled{opacity:.45}
+.pill{min-height:44px;padding:0 14px;border-radius:22px;border:1px solid var(--line);background:rgba(245,239,225,.06);display:inline-flex;align-items:center;gap:6px;font-size:.9rem}
+.dir{font-family:var(--serif);font-weight:700}
+.status{min-height:1.6em;text-align:center;font-size:.88rem;color:var(--muted);padding-bottom:6px}
+.status.err{color:#F0A08F}
+.bar{height:3px;background:rgba(245,239,225,.12);border-radius:2px;overflow:hidden;max-width:240px;margin:0 auto 10px;display:none}
+.bar span{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
+
+/* results: washi paper */
+.paper{background:var(--washi);color:var(--sumi);border-radius:18px;padding:20px 18px 22px;margin:8px 0 18px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.paper[hidden]{display:none}
+.paper h2{font-family:var(--serif);font-size:1.05rem;margin:0 0 10px;color:var(--ai);font-weight:700}
+.sentence{font-family:var(--serif);font-size:1.7rem;line-height:2.3;word-break:break-word}
+.sentence .tok{border-radius:4px;padding:0 1px}
+.sentence .tok.content{border-bottom:2px solid rgba(188,74,52,.35);cursor:pointer}
+.sentence .tok.content:hover,.sentence .tok.content.on{background:rgba(188,74,52,.12)}
+.sentence rt{font-family:var(--sans);font-size:.42em;color:var(--vermilion);letter-spacing:.02em}
+.romaji{color:var(--ink-muted);font-size:.95rem;margin-top:4px;word-break:break-word}
+.trans{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);display:grid;gap:6px}
+.trans p{margin:0}
+.trans .th{font-size:1.12rem;font-weight:500}
+.trans .en{color:var(--ink-muted)}
+.note{margin-top:10px;font-size:.9rem;color:var(--sage)}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.btn{min-height:44px;padding:0 16px;border-radius:22px;border:1px solid rgba(36,31,28,.2);background:transparent;color:var(--sumi);display:inline-flex;align-items:center;gap:6px;font-size:.92rem}
+.btn.primary{background:var(--ai);color:var(--washi);border-color:var(--ai)}
+.btn.primary:disabled{opacity:.5}
+.btn.small{min-height:36px;padding:0 12px;font-size:.85rem}
+textarea.edit{width:100%;min-height:84px;border:1px solid rgba(36,31,28,.2);border-radius:10px;padding:10px;background:#fffaf0;color:var(--sumi);font-family:var(--serif);font-size:1.15rem;resize:vertical}
+.thumb{width:100%;max-height:140px;object-fit:contain;border-radius:10px;background:var(--washi-2);margin-bottom:12px}
+
+/* word list */
+.words{display:grid;gap:0}
+.word{display:grid;grid-template-columns:auto 1fr auto;gap:4px 14px;align-items:start;padding:14px 0;border-top:1px solid var(--line)}
+.word:first-child{border-top:0}
+.word.flash{animation:flash 1s ease}
+@keyframes flash{from{background:rgba(188,74,52,.15)}to{background:transparent}}
+.w-jp{font-family:var(--serif);font-size:1.6rem;line-height:1.25;min-width:2.2em}
+.w-jp small{display:block;font-family:var(--sans);font-size:.78rem;color:var(--vermilion)}
+.w-mean .th{font-weight:500}
+.w-mean .en,.w-mean .rm{font-size:.88rem;color:var(--ink-muted)}
+.w-mean .pos{font-size:.75rem;color:var(--sage)}
+.lvl{font-size:.72rem;font-weight:700;padding:1px 7px;border-radius:9px;background:var(--ai);color:var(--washi);margin-left:6px;vertical-align:2px}
+.w-act{display:flex;flex-direction:column;gap:6px}
+.w-act button{width:36px;height:36px;border-radius:50%;border:1px solid rgba(36,31,28,.2);background:transparent;display:grid;place-items:center;font-size:.95rem}
+.w-act button.done{background:var(--sage);color:#fff;border-color:var(--sage)}
+.kchips{grid-column:2 / 4;display:flex;flex-wrap:wrap;gap:6px}
+.kchip{font-size:.8rem;padding:2px 8px;border-radius:8px;background:var(--washi-2)}
+.kchip b{font-family:var(--serif);font-size:1rem;margin-right:4px}
+.miss{font-size:.85rem;color:var(--ink-muted)}
+.empty{color:var(--ink-muted);font-size:.95rem}
+
+/* history */
+.hist{padding:0 0 32px}
+.hist h2{font-family:var(--serif);font-size:1.05rem;margin:8px 0;color:var(--washi);font-weight:700}
+.hist ul{list-style:none;margin:0;padding:0}
+.hist li button{width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:12px 0;display:grid;gap:2px}
+.hist .h-jp{font-family:var(--serif);font-size:1.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hist .h-th{font-size:.85rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* settings */
+dialog{border:0;border-radius:18px;padding:0;background:var(--washi);color:var(--sumi);width:min(92vw,460px)}
+dialog::backdrop{background:rgba(10,16,30,.6)}
+dialog form{padding:20px}
+dialog h2{font-family:var(--serif);margin:0 0 4px;font-size:1.2rem;color:var(--ai)}
+dialog p.sub{margin:0 0 14px;font-size:.88rem;color:var(--ink-muted)}
+dialog label{display:block;font-size:.88rem;margin:12px 0 4px;font-weight:500}
+dialog input[type=url],dialog input[type=password]{width:100%;min-height:44px;border:1px solid rgba(36,31,28,.25);border-radius:10px;padding:0 12px;background:#fffaf0}
+.check{display:flex;gap:10px;align-items:flex-start;margin-top:14px;font-size:.92rem}
+.check input{width:20px;height:20px;margin-top:3px;accent-color:var(--vermilion)}
+.test-out{font-size:.85rem;margin-top:8px;min-height:1.3em}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="./" aria-label="กลับไปหน้าหลัก 言の葉"><span aria-hidden="true">‹</span><b>言の葉</b> สแกน</a>
+    <button class="icon-btn" id="btnSettings" aria-label="ตั้งค่า">⚙︎</button>
+  </header>
+
+  <div class="finder" id="finder">
+    <video id="video" playsinline muted autoplay></video>
+    <img class="still" id="still" alt="">
+    <div class="frame" id="frame"><i></i><i></i><i></i><i></i><div class="scanline"></div></div>
+    <div class="hint" id="hint">วางคำให้อยู่ในกรอบ แล้วกดถ่าย</div>
+    <div class="finder-tools">
+      <button class="icon-btn" id="btnTorch" aria-label="ไฟฉาย" aria-pressed="false" hidden>🔦</button>
+    </div>
+    <div class="cam-gate" id="camGate">
+      <div class="big">読む</div>
+      <p id="gateMsg">ส่องกล้องไปที่ป้าย เมนู หรือหนังสือ เพื่ออ่านฮิรางานะ คาตากานะ และคันจิ</p>
+      <button class="btn primary" id="btnStart">เปิดกล้อง</button>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="side">
+      <button class="pill dir" id="btnDir" aria-label="สลับทิศทางข้อความ">横 แนวนอน</button>
+    </div>
+    <button class="shutter" id="btnShot" aria-label="ถ่ายและอ่านข้อความ" disabled></button>
+    <div class="side r">
+      <label class="pill" for="file">🖼 รูป</label>
+      <input type="file" id="file" accept="image/*" hidden>
+    </div>
+  </div>
+  <div class="bar" id="bar"><span></span></div>
+  <div class="status" id="status" role="status" aria-live="polite"></div>
+  <div style="text-align:center;margin-bottom:6px"><button class="pill" id="btnType">⌨ พิมพ์หรือวางข้อความเอง</button></div>
+
+  <section class="paper" id="result" hidden>
+    <img class="thumb" id="thumb" alt="ภาพที่สแกน" hidden>
+    <h2>ข้อความที่อ่านได้</h2>
+    <div class="sentence" id="sentence" lang="ja"></div>
+    <div class="romaji" id="romaji"></div>
+    <div class="trans" id="trans" hidden>
+      <p class="th" id="tTh"></p>
+      <p class="en" id="tEn"></p>
+      <p class="note" id="tNote" hidden></p>
+    </div>
+    <div class="row">
+      <button class="btn primary" id="btnAI">✦ แปลทั้งประโยคด้วย AI</button>
+      <button class="btn" id="btnSpeak">🔊 ฟังเสียง</button>
+      <button class="btn" id="btnEdit">✎ แก้ข้อความ</button>
+      <button class="btn" id="btnBack">📷 สแกนต่อ</button>
+    </div>
+    <div id="editBox" hidden style="margin-top:12px">
+      <textarea class="edit" id="editText" lang="ja" aria-label="ข้อความภาษาญี่ปุ่น"></textarea>
+      <div class="row" style="margin-top:8px"><button class="btn primary" id="btnReanalyze">อ่านใหม่</button></div>
+    </div>
+  </section>
+
+  <section class="paper" id="wordsBox" hidden>
+    <h2>คำศัพท์ในข้อความ</h2>
+    <div class="words" id="words"></div>
+  </section>
+
+  <section class="hist" id="histBox" hidden>
+    <h2>สแกนล่าสุด</h2>
+    <ul id="hist"></ul>
+  </section>
+</div>
+
+<dialog id="dlg">
+  <form method="dialog">
+    <h2>ตั้งค่าการแปลด้วย AI</h2>
+    <p class="sub">การอ่านแบบออฟไลน์ใช้ได้ทันทีโดยไม่ต้องตั้งค่า ส่วน AI ต้องใส่ที่อยู่ Worker ที่คุณ deploy ไว้</p>
+    <label for="cfgUrl">ที่อยู่ Worker</label>
+    <input type="url" id="cfgUrl" placeholder="https://kotonoha-scan.yourname.workers.dev" inputmode="url" autocomplete="off">
+    <label for="cfgToken">รหัสแอป (APP_TOKEN)</label>
+    <input type="password" id="cfgToken" autocomplete="off">
+    <div class="check"><input type="checkbox" id="cfgAuto"><label for="cfgAuto" style="margin:0;font-weight:400">ใช้ AI ทันทีที่ถ่ายเมื่อมีอินเทอร์เน็ต (แม่นกว่า แต่มีค่าใช้จ่ายต่อครั้ง)</label></div>
+    <div class="row">
+      <button class="btn" type="button" id="btnTest">ทดสอบการเชื่อมต่อ</button>
+      <button class="btn primary" value="save">บันทึก</button>
+    </div>
+    <div class="test-out" id="testOut"></div>
+  </form>
+</dialog>
+
+<!-- OCR + tokenizer (pinned versions) -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js"></script>
+<script>
+'use strict';
+/* ================= storage (localStorage; same keys Kotonoha uses for custom vocab) ================= */
+const KEYS={cfg:'kotonoha:scanCfg',hist:'kotonoha:scanHistory',vocab:'kotonoha:customVocab'};
+const store={
+  get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+};
+const cfg=Object.assign({workerUrl:'',token:'',autoAI:false,vertical:false},store.get(KEYS.cfg,{}));
+
+/* ================= kana / romaji ================= */
+const kataToHira=s=>s.replace(/[\u30a1-\u30f6]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60));
+const hasKanji=s=>/[\u3400-\u9fff\uf900-\ufaff々]/.test(s);
+const isKana=s=>/^[\u3040-\u30ffー]+$/.test(s);
+const R1={};
+('あa いi うu えe おo かka きki くku けke こko がga ぎgi ぐgu げge ごgo さsa しshi すsu せse そso ざza じji ずzu ぜze ぞzo '+
+ 'たta ちchi つtsu てte とto だda ぢji づzu でde どdo なna にni ぬnu ねne のno はha ひhi ふfu へhe ほho ばba びbi ぶbu べbe ぼbo '+
+ 'ぱpa ぴpi ぷpu ぺpe ぽpo まma みmi むmu めme もmo やya ゆyu よyo らra りri るru れre ろro わwa ゐi ゑe をo ゔvu '+
+ 'ぁa ぃi ぅu ぇe ぉo ゃya ゅyu ょyo ゎwa').split(' ').forEach(p=>{R1[p[0]]=p.slice(1);});
+const R2={};
+[['き','ky'],['ぎ','gy'],['に','ny'],['ひ','hy'],['び','by'],['ぴ','py'],['み','my'],['り','ry']].forEach(([k,r])=>{R2[k+'ゃ']=r+'a';R2[k+'ゅ']=r+'u';R2[k+'ょ']=r+'o';});
+[['し','sh'],['じ','j'],['ち','ch'],['ぢ','j']].forEach(([k,r])=>{R2[k+'ゃ']=r+'a';R2[k+'ゅ']=r+'u';R2[k+'ょ']=r+'o';R2[k+'ぇ']=r+'e';});
+Object.assign(R2,{'ふぁ':'fa','ふぃ':'fi','ふぇ':'fe','ふぉ':'fo','てぃ':'ti','でぃ':'di','とぅ':'tu','どぅ':'du','うぃ':'wi','うぇ':'we','うぉ':'wo','ゔぁ':'va','ゔぃ':'vi','ゔぇ':'ve','ゔぉ':'vo','つぁ':'tsa','いぇ':'ye'});
+function romaAt(s,i){return R2[s.substr(i,2)]||R1[s[i]]||'';}
+function toRomaji(input){
+  const s=kataToHira(input||'');let out='';
+  for(let i=0;i<s.length;){
+    const c=s[i];
+    if(c==='っ'){const nx=romaAt(s,i+1);out+=nx?(nx.startsWith('ch')?'t':nx[0]):'';i++;continue;}
+    if(c==='ー'){const v=out.match(/[aeiou]$/);out+=v?v[0]:'-';i++;continue;}
+    if(c==='ん'){const nx=romaAt(s,i+1);out+=(nx&&/^[aeiouy]/.test(nx))?"n'":'n';i++;continue;}
+    const two=R2[s.substr(i,2)];
+    if(two){out+=two;i+=2;continue;}
+    out+=(R1[c]!==undefined?R1[c]:c);i++;
+  }
+  return out;
+}
+
+/* ================= Kotonoha data ================= */
+let DATA=null;const byWritten=new Map(),byKana=new Map(),kanjiMap=new Map();let maxLen=1;
+const dataReady=fetch('kotonoha-data.json').then(r=>{if(!r.ok)throw new Error(r.status);return r.json();}).then(d=>{
+  DATA=d;
+  const add=(map,key,row)=>{if(!key)return;if(!map.has(key))map.set(key,row);maxLen=Math.max(maxLen,key.length);};
+  d.dict.forEach(row=>{add(byWritten,row[0]||row[1],row);add(byKana,kataToHira(row[1]),row);});
+  d.kanji.forEach(k=>kanjiMap.set(k[0],k));
+}).catch(e=>{console.warn('kotonoha-data.json not loaded',e);});
+function lookupTok(t){
+  return t.row||lookup(t.base,t.reading)||lookup(t.surface,t.reading)||
+    (t.pos==='名詞'||!t.pos?(lookup(t.base+'する',(t.reading||'')+'する')):null);
+}
+function userVocab(){return store.get(KEYS.vocab,[]);}
+function lookup(written,kana){
+  const uv=userVocab();
+  for(const key of [written]){if(!key)continue;
+    if(byWritten.has(key))return byWritten.get(key);
+    const u=uv.find(r=>(r[0]||r[1])===key);if(u)return u;}
+  if(kana){const h=kataToHira(kana);
+    if(byKana.has(h)&&!hasKanji(written||''))return byKana.get(h);
+    const u=uv.find(r=>kataToHira(r[1])===h&&!r[0]&&!hasKanji(written||''));if(u)return u;}
+  return null;
+}
+
+/* ================= tokenizer (kuromoji, with dictionary fallback) ================= */
+// kuromoji joins dicPath with path.join, which turns "https://" into "https:/" — repair it.
+(function(){const o=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u){if(typeof u==='string')arguments[1]=u.replace(/^(https?):\/(?!\/)/,'$1://');return o.apply(this,arguments);};})();
+let tokP=null;
+function getTokenizer(){
+  if(!tokP)tokP=new Promise((res,rej)=>{
+    if(typeof kuromoji==='undefined')return rej(new Error('kuromoji missing'));
+    kuromoji.builder({dicPath:'https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict/'}).build((e,t)=>e?rej(e):res(t));
+  }).catch(e=>{tokP=null;throw e;});
+  return tokP;
+}
+const POS_TH={'名詞':'คำนาม','動詞':'กริยา','形容詞':'คุณศัพท์ (い)','副詞':'คำวิเศษณ์','助詞':'คำช่วย','助動詞':'คำช่วยกริยา','連体詞':'คำขยายนาม','接続詞':'คำเชื่อม','感動詞':'คำอุทาน','接頭詞':'คำนำหน้า','記号':'สัญลักษณ์','フィラー':'คำเติม'};
+const CONTENT=new Set(['名詞','動詞','形容詞','副詞','連体詞','接続詞','感動詞']);
+function particleRomaji(t){if(t.pos==='助詞'){if(t.surface==='は')return 'wa';if(t.surface==='へ')return 'e';if(t.surface==='を')return 'o';}return null;}
+
+async function tokenize(text){
+  try{
+    const tk=await getTokenizer();
+    return tk.tokenize(text).map(t=>{
+      const reading=t.reading&&t.reading!=='*'?kataToHira(t.reading):(isKana(t.surface_form)?kataToHira(t.surface_form):'');
+      const base=t.basic_form&&t.basic_form!=='*'?t.basic_form:t.surface_form;
+      const content=CONTENT.has(t.pos)&&t.pos_detail_1!=='非自立'&&t.pos_detail_1!=='数'&&t.pos_detail_1!=='接尾'&&!/^[\s\p{P}\d０-９]+$/u.test(t.surface_form);
+      return {surface:t.surface_form,reading,base,pos:t.pos,content};
+    }).map(t=>{if(t.content){const row=lookup(t.surface,'');if(row&&row[0]===t.surface)t.reading=kataToHira(row[1]);}return t;});
+  }catch(e){
+    console.warn('tokenizer fallback',e);return greedyTokens(text);
+  }
+}
+function greedyTokens(text){
+  const out=[];
+  for(let i=0;i<text.length;){
+    let hit=null;
+    for(let L=Math.min(maxLen,text.length-i);L>=1;L--){
+      const piece=text.substr(i,L);const row=byWritten.get(piece)||(L>1?byKana.get(kataToHira(piece)):null);
+      if(row){hit={surface:piece,reading:kataToHira(row[1]),base:piece,pos:'',content:true,row};break;}
+    }
+    if(hit){out.push(hit);i+=hit.surface.length;}
+    else{const c=text[i];const k=kanjiMap.get(c);
+      out.push({surface:c,reading:isKana(c)?kataToHira(c):(k?firstReading(k):''),base:c,pos:'',content:!!k});i++;}
+  }
+  return out;
+}
+function firstReading(k){const kun=(k[2]||'').split(/[・、,\s]/)[0].replace(/[-.]/g,'');const on=(k[1]||'').split(/[・、,\s]/)[0];return kataToHira(kun||on||'');}
+
+/* furigana: put the reading only over the kanji part, keep okurigana outside */
+function ruby(surface,reading){
+  if(!reading||!hasKanji(surface))return esc(surface);
+  const parts=surface.match(/[\u3400-\u9fff\uf900-\ufaff々]+|[^\u3400-\u9fff\uf900-\ufaff々]+/g);
+  if(parts.length>1){
+    const re=new RegExp('^'+parts.map(p=>hasKanji(p)?'(.+?)':'('+kataToHira(p).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')').join('')+'$');
+    const m=kataToHira(reading).match(re);
+    if(m)return parts.map((p,i)=>hasKanji(p)?'<ruby>'+esc(p)+'<rt>'+esc(m[i+1])+'</rt></ruby>':esc(p)).join('');
+  }
+  const r=kataToHira(reading);let a=0,b=0;
+  while(a<surface.length&&a<r.length&&!hasKanji(surface[a])&&kataToHira(surface[a])===r[a])a++;
+  while(b<surface.length-a&&b<r.length-a&&!hasKanji(surface[surface.length-1-b])&&kataToHira(surface[surface.length-1-b])===r[r.length-1-b])b++;
+  const pre=surface.slice(0,a),mid=surface.slice(a,surface.length-b),post=surface.slice(surface.length-b);
+  const rmid=r.slice(a,r.length-b);
+  return esc(pre)+'<ruby>'+esc(mid)+'<rt>'+esc(rmid)+'</rt></ruby>'+esc(post);
+}
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ================= OCR (Tesseract) ================= */
+let tess=null,tessLang=null;
+async function getTess(lang){
+  if(tess&&tessLang===lang)return tess;
+  if(tess){try{await tess.terminate();}catch(e){}tess=null;}
+  if(typeof Tesseract==='undefined')throw new Error('ยังโหลดตัวอ่านข้อความไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่');
+  tess=await Tesseract.createWorker(lang,1,{logger:m=>{
+    if(m.status==='loading language traineddata')progress('กำลังโหลดชุดอ่านภาษาญี่ปุ่น (ครั้งแรกเท่านั้น)',m.progress);
+    else if(m.status==='recognizing text')progress('กำลังอ่านข้อความ',m.progress);
+  }});
+  tessLang=lang;return tess;
+}
+function cleanOCR(t){
+  return t.split('\n')
+    .map(l=>l.replace(/([^\x00-\x7F])\s+(?=[^\x00-\x7F])/g,'$1').trim())
+    .filter(l=>/[\u3040-\u30ff\u3400-\u9fff々ー]/.test(l))
+    .join('\n');
+}
+async function ocrOffline(canvas){
+  const lang=cfg.vertical?'jpn_vert':'jpn';
+  const w=await getTess(lang);
+  await w.setParameters({tessedit_pageseg_mode:cfg.vertical?'5':'6',preserve_interword_spaces:'1'});
+  const {data}=await w.recognize(canvas);
+  return cleanOCR(data.text||'');
+}
+
+/* ================= AI (via your Worker) ================= */
+async function aiAnalyze({imageB64,text}){
+  if(!cfg.workerUrl)throw Object.assign(new Error('ยังไม่ได้ตั้งค่า Worker สำหรับ AI'),{needsSetup:true});
+  const ctl=new AbortController();const timer=setTimeout(()=>ctl.abort(),45000);
+  try{
+    const r=await fetch(cfg.workerUrl,{method:'POST',signal:ctl.signal,
+      headers:Object.assign({'Content-Type':'application/json'},cfg.token?{'X-App-Token':cfg.token}:{}),
+      body:JSON.stringify({image:imageB64||null,media_type:'image/jpeg',text:text||'',vertical:cfg.vertical})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(j.error?('AI ตอบกลับไม่สำเร็จ: '+j.error):('AI ตอบกลับไม่สำเร็จ (รหัส '+r.status+')'));
+    return j;
+  }catch(e){if(e.name==='AbortError')throw new Error('AI ใช้เวลานานเกินไป ลองใหม่อีกครั้ง');throw e;}
+  finally{clearTimeout(timer);}
+}
+
+/* ================= camera ================= */
+const $=id=>document.getElementById(id);
+const video=$('video'),finder=$('finder'),frameEl=$('frame');
+let stream=null,track=null,torchOn=false,camWanted=false;
+async function startCamera(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    gateMsg('เบราว์เซอร์นี้เปิดกล้องไม่ได้ ใช้ปุ่ม "รูป" เพื่อเลือกภาพแทน',true);return;}
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}});
+    video.srcObject=stream;await video.play();
+    track=stream.getVideoTracks()[0];
+    track.addEventListener('ended',()=>{stopCamera();$('btnShot').disabled=true;$('btnStart').textContent='เปิดกล้องอีกครั้ง';gateMsg('กล้องถูกปิดไป กดเพื่อเปิดใหม่',false);});
+    camWanted=true;$('camGate').hidden=true;$('btnShot').disabled=false;
+    try{const caps=track.getCapabilities&&track.getCapabilities();if(caps&&caps.torch)$('btnTorch').hidden=false;}catch(e){}
+    try{await track.applyConstraints({advanced:[{focusMode:'continuous'}]});}catch(e){}
+  }catch(e){
+    const msg=e.name==='NotAllowedError'?'ยังไม่ได้อนุญาตให้ใช้กล้อง เปิดสิทธิ์ในการตั้งค่าเบราว์เซอร์ แล้วกด "เปิดกล้อง" อีกครั้ง'
+      :e.name==='NotFoundError'?'ไม่พบกล้องในอุปกรณ์นี้ ใช้ปุ่ม "รูป" แทน'
+      :'เปิดกล้องไม่ได้ ('+e.name+') ใช้ปุ่ม "รูป" แทน';
+    gateMsg(msg,true);
+  }
+}
+function stopCamera(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;track=null;}}
+function gateMsg(m,err){$('camGate').hidden=false;$('gateMsg').textContent=m;$('gateMsg').style.color=err?'#F0A08F':'';}
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){if(stream){stopCamera();$('btnShot').disabled=true;gateMsg('กล้องหยุดชั่วคราว',false);$('btnStart').textContent='เปิดกล้องอีกครั้ง';}}
+  else if(camWanted&&!stream){startCamera();}
+});
+
+/* crop the guide-frame region from the video (accounts for object-fit: cover) */
+function grabFrame(){
+  const iw=video.videoWidth,ih=video.videoHeight;if(!iw)return null;
+  const vr=video.getBoundingClientRect(),fr=frameEl.getBoundingClientRect();
+  const scale=Math.max(vr.width/iw,vr.height/ih);
+  const offX=(vr.width-iw*scale)/2,offY=(vr.height-ih*scale)/2;
+  const pad=8;
+  let sx=(fr.left-vr.left-offX-pad)/scale,sy=(fr.top-vr.top-offY-pad)/scale;
+  let sw=(fr.width+pad*2)/scale,sh=(fr.height+pad*2)/scale;
+  sx=Math.max(0,sx);sy=Math.max(0,sy);sw=Math.min(iw-sx,sw);sh=Math.min(ih-sy,sh);
+  const c=document.createElement('canvas');c.width=Math.round(sw);c.height=Math.round(sh);
+  c.getContext('2d').drawImage(video,sx,sy,sw,sh,0,0,c.width,c.height);
+  return c;
+}
+function fitCanvas(src,maxSide,minSide){
+  const long=Math.max(src.width,src.height);let k=1;
+  if(long>maxSide)k=maxSide/long;else if(minSide&&long<minSide)k=Math.min(3,minSide/long);
+  const c=document.createElement('canvas');c.width=Math.round(src.width*k);c.height=Math.round(src.height*k);
+  const g=c.getContext('2d');g.imageSmoothingQuality='high';g.drawImage(src,0,0,c.width,c.height);return c;
+}
+/* grayscale + contrast stretch helps Tesseract on photos */
+function prepForOCR(src){
+  const c=fitCanvas(src,2200,1400),g=c.getContext('2d');
+  const img=g.getImageData(0,0,c.width,c.height),d=img.data,hist=new Uint32Array(256);
+  for(let i=0;i<d.length;i+=4){const y=(d[i]*299+d[i+1]*587+d[i+2]*114)/1000|0;d[i]=y;hist[y]++;}
+  const total=c.width*c.height;let lo=0,hi=255,acc=0;
+  for(;lo<255;lo++){acc+=hist[lo];if(acc>total*.02)break;}
+  acc=0;for(;hi>0;hi--){acc+=hist[hi];if(acc>total*.02)break;}
+  const span=Math.max(1,hi-lo);
+  for(let i=0;i<d.length;i+=4){let v=(d[i]-lo)*255/span;v=v<0?0:v>255?255:v;d[i]=d[i+1]=d[i+2]=v;}
+  g.putImageData(img,0,0);return c;
+}
+const toJpegB64=c=>fitCanvas(c,1600).toDataURL('image/jpeg',.85).split(',')[1];
+
+/* ================= UI state ================= */
+let current=null; // {text, imageB64, tokens, ai}
+function status(msg,err){const s=$('status');s.textContent=msg||'';s.classList.toggle('err',!!err);}
+function progress(msg,p){status(msg);const b=$('bar');b.style.display=p==null?'none':'block';b.firstElementChild.style.width=Math.round((p||0)*100)+'%';}
+function busy(on){finder.classList.toggle('busy',on);$('btnShot').disabled=on||!stream;$('btnAI').disabled=on;if(!on)$('bar').style.display='none';}
+
+function setDir(){
+  finder.classList.toggle('vert',cfg.vertical);
+  $('btnDir').textContent=cfg.vertical?'縦 แนวตั้ง':'横 แนวนอน';
+  $('hint').textContent=cfg.vertical?'วางข้อความแนวตั้งให้อยู่ในกรอบ':'วางคำให้อยู่ในกรอบ แล้วกดถ่าย';
+}
+
+async function handleCanvas(canvas){
+  busy(true);$('thumb').src=canvas.toDataURL('image/jpeg',.7);$('thumb').hidden=false;
+  const imageB64=toJpegB64(canvas);
+  current={text:'',imageB64,tokens:[],ai:null};
+  try{
+    if(cfg.autoAI&&cfg.workerUrl&&navigator.onLine){
+      status('AI กำลังอ่านภาพ…');
+      try{const ai=await aiAnalyze({imageB64});await showAI(ai);status('');return;}
+      catch(e){status(e.message+' — อ่านแบบออฟไลน์แทน',true);}
+    }
+    const text=await ocrOffline(prepForOCR(canvas));
+    if(!text){showEmpty();status('ไม่พบตัวอักษรญี่ปุ่นในกรอบ ลองขยับให้ใกล้ขึ้นหรือเปิดไฟ',true);return;}
+    await showOffline(text);status('');
+  }catch(e){console.error(e);status(e.message||'อ่านข้อความไม่สำเร็จ',true);}
+  finally{busy(false);}
+}
+
+function showEmpty(){
+  $('result').hidden=false;$('sentence').innerHTML='<span class="empty">ไม่พบข้อความ</span>';
+  $('romaji').textContent='';$('trans').hidden=true;$('wordsBox').hidden=true;
+}
+
+async function showOffline(text){
+  await dataReady;
+  current.text=text;current.ai=null;
+  status('กำลังแยกคำ…');
+  const tokens=await tokenize(text);
+  current.tokens=tokens;
+  renderSentence(tokens);
+  $('trans').hidden=true;
+  renderWords(tokens.filter(t=>t.content).map(t=>{
+    const row=lookupTok(t);
+    return {surface:t.surface,base:t.base,reading:t.reading,pos:t.pos,row};
+  }));
+  revealResults();saveHistory(text,null);
+}
+
+async function showAI(ai){
+  await dataReady;
+  const text=(ai.text||'').trim();
+  if(!text){showEmpty();status('AI ไม่พบตัวอักษรญี่ปุ่นในภาพ',true);return;}
+  current.text=text;current.ai=ai;
+  let tokens;
+  try{tokens=await tokenize(text);}catch(e){tokens=[{surface:text,reading:ai.reading||'',content:false}];}
+  current.tokens=tokens;renderSentence(tokens);
+  if(ai.romaji)$('romaji').textContent=ai.romaji;
+  $('tTh').textContent=ai.th||'';$('tEn').textContent=ai.en||'';
+  $('tNote').textContent=ai.note_th||'';$('tNote').hidden=!ai.note_th;$('trans').hidden=false;
+  renderWords((ai.words||[]).map(w=>{
+    const base=w.base||w.surface;const row=lookup(base,w.reading)||lookup(w.surface,w.reading);
+    return {surface:w.surface,base,reading:kataToHira(w.reading||''),pos:'',posTh:w.pos_th,ai:w,row};
+  }));
+  revealResults();saveHistory(text,ai);
+}
+
+function renderSentence(tokens){
+  let idx=0;
+  $('sentence').innerHTML=tokens.map(t=>{
+    if(t.surface==='\n')return '<br>';
+    const cls=t.content?'tok content':'tok';const data=t.content?' data-i="'+(idx++)+'"':'';
+    return '<span class="'+cls+'"'+data+'>'+ruby(t.surface,t.reading).replace(/\n/g,'<br>')+'</span>';
+  }).join('');
+  $('romaji').textContent=tokens.map(t=>t.surface==='\n'?'\n':(particleRomaji(t)||(t.reading?toRomaji(t.reading):(/^[\x00-\x7F]+$/.test(t.surface)?t.surface:'')))).join(' ').replace(/ +/g,' ').trim();
+}
+
+function renderWords(list){
+  const box=$('words');box.innerHTML='';
+  if(!list.length){box.innerHTML='<p class="empty">ไม่มีคำศัพท์หลักในข้อความนี้</p>';$('wordsBox').hidden=false;return;}
+  const seen=new Set();
+  list.forEach((w,i)=>{
+    const key=w.base+'|'+w.reading;const dup=seen.has(key);seen.add(key);
+    const el=document.createElement('div');el.className='word';el.id='w'+i;if(dup)el.style.display='none';
+    const row=w.row;
+    const showWord=row?(row[0]||row[1]):w.base;
+    const reading=row?kataToHira(row[1]):(w.ai&&w.base!==w.surface?'':w.reading);
+    const th=row?row[4]:(w.ai&&w.ai.th)||'';const en=row?row[3]:(w.ai&&w.ai.en)||'';
+    const rm=row?row[2]:(w.ai&&w.ai.romaji)||toRomaji(reading);
+    const lvl=row?row[6]:(w.ai&&w.ai.jlpt)||'';
+    const pos=w.posTh||POS_TH[w.pos]||'';
+    const inflected=w.surface!==showWord?'<div class="pos">ในข้อความ: '+esc(w.surface)+'</div>':'';
+    let mean;
+    if(th||en){mean='<div class="th">'+esc(th)+(lvl?'<span class="lvl">'+esc(lvl)+'</span>':'')+'</div>'+(en?'<div class="en">'+esc(en)+'</div>':'')+'<div class="rm">'+esc(rm)+'</div>'+(pos?'<div class="pos">'+esc(pos)+'</div>':'')+inflected;}
+    else{mean='<div class="rm">'+esc(rm)+'</div>'+(pos?'<div class="pos">'+esc(pos)+'</div>':'')+inflected+'<div class="miss">ยังไม่มีในคลังคำ ลองกด "แปลด้วย AI"</div>';}
+    const kch=[...showWord].filter(c=>kanjiMap.has(c)).map(c=>{const k=kanjiMap.get(c);return '<span class="kchip"><b lang="ja">'+esc(c)+'</b>'+esc(k[4]||k[3])+'</span>';}).join('');
+    const canAdd=!row&&(th||en);const inVocab=!row&&userVocab().some(r=>(r[0]||r[1])===showWord);
+    el.innerHTML='<div class="w-jp" lang="ja">'+(reading&&hasKanji(showWord)?'<small>'+esc(reading)+'</small>':'')+esc(showWord)+'</div>'+
+      '<div class="w-mean">'+mean+'</div>'+
+      '<div class="w-act"><button aria-label="ฟังเสียง '+esc(showWord)+'" data-say="'+esc(reading||showWord)+'">🔊</button>'+
+      (canAdd||inVocab?'<button aria-label="เพิ่มลงคลังคำ" class="'+(inVocab?'done':'')+'" data-add="'+i+'">'+(inVocab?'✓':'＋')+'</button>':'')+'</div>'+
+      (kch?'<div class="kchips">'+kch+'</div>':'');
+    el._w={kanji:hasKanji(showWord)?showWord:'',kana:reading||(isKana(showWord)?kataToHira(showWord):''),romaji:rm,en,th,lvl};
+    box.appendChild(el);
+  });
+  $('wordsBox').hidden=false;
+}
+
+function revealResults(){$('result').hidden=false;$('editText').value=current.text;$('editBox').hidden=true;
+  requestAnimationFrame(()=>$('result').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth',block:'start'}));}
+
+/* ================= speech, vocab, history ================= */
+function say(text){
+  if(!('speechSynthesis' in window)){status('อุปกรณ์นี้ไม่รองรับการอ่านออกเสียง',true);return;}
+  speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='ja-JP';u.rate=.9;
+  const v=speechSynthesis.getVoices().find(v=>/^ja/i.test(v.lang));if(v)u.voice=v;speechSynthesis.speak(u);
+}
+function addVocab(w){
+  const list=userVocab();const key=w.kanji||w.kana;
+  if(list.some(r=>(r[0]||r[1])===key))return false;
+  list.push([w.kanji,w.kana,w.romaji,w.en,w.th,'scan',w.lvl||'']);store.set(KEYS.vocab,list);return true;
+}
+function saveHistory(text,ai){
+  const h=store.get(KEYS.hist,[]).filter(x=>x.text!==text);
+  h.unshift({text,th:ai?ai.th:'',en:ai?ai.en:'',ai:ai||null,t:Date.now()});store.set(KEYS.hist,h.slice(0,30));renderHistory();
+}
+function renderHistory(){
+  const h=store.get(KEYS.hist,[]);$('histBox').hidden=!h.length;
+  $('hist').innerHTML=h.map((x,i)=>'<li><button data-h="'+i+'"><span class="h-jp" lang="ja">'+esc(x.text.replace(/\n/g,' '))+'</span>'+(x.th?'<span class="h-th">'+esc(x.th)+'</span>':'')+'</button></li>').join('');
+}
+
+/* ================= events ================= */
+$('btnStart').onclick=startCamera;
+$('btnBack').onclick=()=>{finder.scrollIntoView({behavior:'smooth',block:'start'});if(!stream)startCamera();};
+$('btnShot').onclick=()=>{const c=grabFrame();if(!c){status('กล้องยังไม่พร้อม',true);return;}if(navigator.vibrate)navigator.vibrate(15);handleCanvas(c);};
+$('btnDir').onclick=()=>{cfg.vertical=!cfg.vertical;store.set(KEYS.cfg,cfg);setDir();};
+$('btnTorch').onclick=async()=>{if(!track)return;torchOn=!torchOn;try{await track.applyConstraints({advanced:[{torch:torchOn}]});$('btnTorch').setAttribute('aria-pressed',torchOn);}catch(e){torchOn=false;}};
+$('file').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;const img=new Image();
+  img.onload=()=>{const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;c.getContext('2d').drawImage(img,0,0);URL.revokeObjectURL(img.src);handleCanvas(fitCanvas(c,2400));};
+  img.onerror=()=>status('เปิดรูปนี้ไม่ได้ ลองเลือกไฟล์ JPG หรือ PNG',true);
+  img.src=URL.createObjectURL(f);e.target.value='';
+};
+$('btnType').onclick=()=>{current=current||{text:'',imageB64:null,tokens:[],ai:null};$('result').hidden=false;$('thumb').hidden=true;
+  if(!current.text){$('sentence').innerHTML='';$('romaji').textContent='';$('trans').hidden=true;$('wordsBox').hidden=true;}
+  $('editBox').hidden=false;$('editText').focus();};
+$('btnEdit').onclick=()=>{$('editBox').hidden=!$('editBox').hidden;if(!$('editBox').hidden)$('editText').focus();};
+$('btnReanalyze').onclick=async()=>{const t=$('editText').value.trim();if(!t)return;current=Object.assign(current||{},{imageB64:null,ai:null});$('thumb').hidden=true;busy(true);try{await showOffline(t);status('');}catch(e){status(e.message,true);}finally{busy(false);}};
+$('btnAI').onclick=async()=>{
+  if(!current||(!current.text&&!current.imageB64))return;
+  busy(true);status('AI กำลังแปล…');
+  try{const ai=await aiAnalyze({imageB64:current.imageB64,text:current.text});await showAI(ai);status('');}
+  catch(e){status(e.message,true);if(e.needsSetup)openSettings();}
+  finally{busy(false);}
+};
+$('btnSpeak').onclick=()=>current&&current.text&&say(current.text);
+$('sentence').onclick=e=>{const t=e.target.closest('.tok.content');if(!t)return;let el=$('w'+t.dataset.i);
+  if(el){if(el.style.display==='none'){const k=el._w&&(el._w.kanji||el._w.kana);el=[...document.querySelectorAll('.word')].find(x=>x._w&&(x._w.kanji||x._w.kana)===k&&x.style.display!=='none')||el;}
+    el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');}};
+$('words').onclick=e=>{
+  const s=e.target.closest('[data-say]');if(s){say(s.dataset.say);return;}
+  const a=e.target.closest('[data-add]');if(a&&!a.classList.contains('done')){const w=a.closest('.word')._w;if(addVocab(w)){a.classList.add('done');a.textContent='✓';status('เพิ่ม '+(w.kanji||w.kana)+' ลงคลังคำแล้ว');}}
+};
+$('hist').onclick=async e=>{const b=e.target.closest('[data-h]');if(!b)return;const x=store.get(KEYS.hist,[])[+b.dataset.h];if(!x)return;
+  current={text:x.text,imageB64:null,tokens:[],ai:null};$('thumb').hidden=true;busy(true);
+  try{if(x.ai)await showAI(x.ai);else await showOffline(x.text);}finally{busy(false);}};
+
+/* settings */
+function openSettings(){$('cfgUrl').value=cfg.workerUrl;$('cfgToken').value=cfg.token;$('cfgAuto').checked=cfg.autoAI;$('testOut').textContent='';$('dlg').showModal();}
+$('btnSettings').onclick=openSettings;
+$('dlg').addEventListener('close',()=>{if($('dlg').returnValue!=='save')return;
+  cfg.workerUrl=$('cfgUrl').value.trim();cfg.token=$('cfgToken').value.trim();cfg.autoAI=$('cfgAuto').checked;store.set(KEYS.cfg,cfg);status('บันทึกการตั้งค่าแล้ว');});
+$('btnTest').onclick=async()=>{
+  const url=$('cfgUrl').value.trim(),tok=$('cfgToken').value.trim();const out=$('testOut');
+  if(!url){out.textContent='ใส่ที่อยู่ Worker ก่อน';return;}out.textContent='กำลังทดสอบ…';
+  try{const r=await fetch(url,{method:'POST',headers:Object.assign({'Content-Type':'application/json'},tok?{'X-App-Token':tok}:{}),body:JSON.stringify({ping:true})});
+    const j=await r.json().catch(()=>({}));out.textContent=r.ok&&j.ok?'เชื่อมต่อได้ ✓':('เชื่อมต่อไม่ได้: '+(j.error||r.status));}
+  catch(e){out.textContent='เชื่อมต่อไม่ได้: ตรวจสอบที่อยู่ และ ALLOWED_ORIGINS ใน Worker';}
+};
+
+setDir();renderHistory();
+if(navigator.permissions&&navigator.permissions.query){navigator.permissions.query({name:'camera'}).then(p=>{if(p.state==='granted')startCamera();}).catch(()=>{});}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('service-worker.js').catch(()=>{});}
+</script>
+</body>
+</html>
