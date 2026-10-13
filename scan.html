@@ -22,6 +22,7 @@
   --serif:'Shippori Mincho B1','Noto Sans Thai',serif;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0;height:100%}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{background:var(--ai);color:var(--washi);font-family:var(--sans);line-height:1.6;
@@ -192,6 +193,7 @@ dialog input[type=url],dialog input[type=password]{width:100%;min-height:44px;bo
       <button class="btn primary" id="btnAI">✦ แปลทั้งประโยคด้วย AI</button>
       <button class="btn" id="btnSpeak">🔊 ฟังเสียง</button>
       <button class="btn" id="btnEdit">✎ แก้ข้อความ</button>
+      <button class="btn" id="btnBack">📷 สแกนต่อ</button>
     </div>
     <div id="editBox" hidden style="margin-top:12px">
       <textarea class="edit" id="editText" lang="ja" aria-label="ข้อความภาษาญี่ปุ่น"></textarea>
@@ -398,7 +400,7 @@ async function aiAnalyze({imageB64,text}){
 /* ================= camera ================= */
 const $=id=>document.getElementById(id);
 const video=$('video'),finder=$('finder'),frameEl=$('frame');
-let stream=null,track=null,torchOn=false;
+let stream=null,track=null,torchOn=false,camWanted=false;
 async function startCamera(){
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
     gateMsg('เบราว์เซอร์นี้เปิดกล้องไม่ได้ ใช้ปุ่ม "รูป" เพื่อเลือกภาพแทน',true);return;}
@@ -406,7 +408,8 @@ async function startCamera(){
     stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}});
     video.srcObject=stream;await video.play();
     track=stream.getVideoTracks()[0];
-    $('camGate').hidden=true;$('btnShot').disabled=false;
+    track.addEventListener('ended',()=>{stopCamera();$('btnShot').disabled=true;$('btnStart').textContent='เปิดกล้องอีกครั้ง';gateMsg('กล้องถูกปิดไป กดเพื่อเปิดใหม่',false);});
+    camWanted=true;$('camGate').hidden=true;$('btnShot').disabled=false;
     try{const caps=track.getCapabilities&&track.getCapabilities();if(caps&&caps.torch)$('btnTorch').hidden=false;}catch(e){}
     try{await track.applyConstraints({advanced:[{focusMode:'continuous'}]});}catch(e){}
   }catch(e){
@@ -420,6 +423,7 @@ function stopCamera(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=
 function gateMsg(m,err){$('camGate').hidden=false;$('gateMsg').textContent=m;$('gateMsg').style.color=err?'#F0A08F':'';}
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden){if(stream){stopCamera();$('btnShot').disabled=true;gateMsg('กล้องหยุดชั่วคราว',false);$('btnStart').textContent='เปิดกล้องอีกครั้ง';}}
+  else if(camWanted&&!stream){startCamera();}
 });
 
 /* crop the guide-frame region from the video (accounts for object-fit: cover) */
@@ -589,6 +593,7 @@ function renderHistory(){
 
 /* ================= events ================= */
 $('btnStart').onclick=startCamera;
+$('btnBack').onclick=()=>{finder.scrollIntoView({behavior:'smooth',block:'start'});if(!stream)startCamera();};
 $('btnShot').onclick=()=>{const c=grabFrame();if(!c){status('กล้องยังไม่พร้อม',true);return;}if(navigator.vibrate)navigator.vibrate(15);handleCanvas(c);};
 $('btnDir').onclick=()=>{cfg.vertical=!cfg.vertical;store.set(KEYS.cfg,cfg);setDir();};
 $('btnTorch').onclick=async()=>{if(!track)return;torchOn=!torchOn;try{await track.applyConstraints({advanced:[{torch:torchOn}]});$('btnTorch').setAttribute('aria-pressed',torchOn);}catch(e){torchOn=false;}};
